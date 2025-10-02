@@ -1,0 +1,42 @@
+name: Auto Commit Daily
+
+on:
+  schedule:
+    # Run twice daily: 9:00 AM and 6:00 PM UTC
+    - cron: '0 9 * * *'   # 9:00 AM UTC
+    - cron: '0 18 * * *'  # 6:00 PM UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Auto Commit"
+
+    - name: Run auto-commit script
+      run: node auto-commit.js
+
+    - name: Push changes
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          git push
+        else
+          echo "No changes to push"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
