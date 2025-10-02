@@ -1,0 +1,72 @@
+name: Daily Auto Commit
+
+on:
+  schedule:
+    # Runs daily at 12:00 UTC (you can change this time)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Update loop file
+      run: |
+        # Read the current content and find the maximum dots
+        if [ ! -f "loop" ]; then
+          echo "Loop file not found!"
+          exit 1
+        fi
+        
+        # Find the line with the most dots
+        max_dots=0
+        while IFS= read -r line; do
+          if [[ "$line" =~ ^\.+$ ]]; then
+            dot_count=${#line}
+            if [ $dot_count -gt $max_dots ]; then
+              max_dots=$dot_count
+            fi
+          fi
+        done < loop
+        
+        # Create new line with one more dot
+        new_dots=$((max_dots + 1))
+        new_line=$(printf "%*s" $new_dots | tr ' ' '.')
+        
+        # Add the new line to the file
+        echo "$new_line" >> loop
+        
+        echo "Added: $new_line (${new_dots} dots)"
+    
+    - name: Commit and push changes
+      run: |
+        git add loop
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+        
+        # Get current date for commit message
+        current_date=$(date +"%Y-%m-%d")
+        
+        # Count dots in the new line
+        new_dots=$(tail -n 1 loop | wc -c)
+        new_dots=$((new_dots - 1)) # Remove newline character from count
+        
+        git commit -m "Daily update: Added $(printf "%*s" $new_dots | tr ' ' '.') on $current_date"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
