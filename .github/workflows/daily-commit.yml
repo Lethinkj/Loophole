@@ -9,17 +9,19 @@ on:
 jobs:
   auto-commit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
     
     - name: Setup Git
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
     
     - name: Update loop file
       run: |
@@ -29,25 +31,37 @@ jobs:
           exit 1
         fi
         
+        echo "Current loop file content:"
+        cat loop
+        echo "---"
+        
         # Find the line with the most dots
         max_dots=0
         while IFS= read -r line; do
+          # Remove any carriage return characters
+          line=$(echo "$line" | tr -d '\r')
           if [[ "$line" =~ ^\.+$ ]]; then
             dot_count=${#line}
+            echo "Found dot line: '$line' with $dot_count dots"
             if [ $dot_count -gt $max_dots ]; then
               max_dots=$dot_count
             fi
           fi
         done < loop
         
+        echo "Maximum dots found: $max_dots"
+        
         # Create new line with one more dot
         new_dots=$((max_dots + 1))
         new_line=$(printf "%*s" $new_dots | tr ' ' '.')
         
+        echo "Adding new line: '$new_line' with $new_dots dots"
+        
         # Add the new line to the file
         echo "$new_line" >> loop
         
-        echo "Added: $new_line (${new_dots} dots)"
+        echo "Updated loop file content:"
+        cat loop
     
     - name: Commit and push changes
       run: |
@@ -59,14 +73,19 @@ jobs:
           exit 0
         fi
         
+        # Show what we're about to commit
+        echo "Changes to be committed:"
+        git diff --staged
+        
         # Get current date for commit message
         current_date=$(date +"%Y-%m-%d")
         
-        # Count dots in the new line
-        new_dots=$(tail -n 1 loop | wc -c)
-        new_dots=$((new_dots - 1)) # Remove newline character from count
+        # Get the number of dots in the new line we just added
+        new_line=$(tail -n 1 loop)
+        new_dots=${#new_line}
         
-        git commit -m "Daily update: Added $(printf "%*s" $new_dots | tr ' ' '.') on $current_date"
+        commit_message="Daily update: Added $new_line on $current_date"
+        echo "Commit message: $commit_message"
+        
+        git commit -m "$commit_message"
         git push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
