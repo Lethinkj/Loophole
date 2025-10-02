@@ -1,0 +1,35 @@
+name: Simple Auto Commit
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Auto Commit"
+
+    - name: Make changes and commit
+      run: |
+        # Simple approach - just add timestamp to loop file
+        echo "Auto commit at $(date -u)" >> loop
+        
+        # Always create a commit
+        git add .
+        git commit -m "Auto commit - $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
