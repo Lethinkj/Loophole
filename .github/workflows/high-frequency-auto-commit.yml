@@ -1,10 +1,12 @@
-name: Auto Commit Every 5 Minutes
+name: High Frequency Auto Commit
 
 on:
   schedule:
-    # Run every 5 minutes
-    - cron: '*/5 * * * *'
+    # Multiple schedules to increase frequency (GitHub limitation: minimum 5 minutes)
+    - cron: '0,5,10,15,20,25,30,35,40,45,50,55 * * * *'  # Every 5 minutes
   workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [ main ]  # Also trigger on push to main
 
 jobs:
   auto-commit:
@@ -22,7 +24,24 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Auto Commit"
 
-    - name: Check current state and perform action
+    - name: Check if enough time has passed
+      id: time_check
+      run: |
+        # Check if last commit was less than 4 minutes ago to avoid too frequent commits
+        LAST_COMMIT_TIME=$(git log -1 --format="%ct")
+        CURRENT_TIME=$(date +%s)
+        TIME_DIFF=$((CURRENT_TIME - LAST_COMMIT_TIME))
+        
+        if [ $TIME_DIFF -lt 240 ]; then  # Less than 4 minutes
+          echo "skip=true" >> $GITHUB_OUTPUT
+          echo "⏰ Skipping: Only $TIME_DIFF seconds since last commit (minimum 240s)"
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "✅ Proceeding: $TIME_DIFF seconds since last commit"
+        fi
+
+    - name: Perform auto-commit action
+      if: steps.time_check.outputs.skip == 'false'
       run: |
         # Create state file if it doesn't exist
         if [ ! -f commit-state.json ]; then
@@ -30,8 +49,8 @@ jobs:
         fi
         
         # Read current state
-        SHOULD_ADD=$(cat commit-state.json | grep -o '"shouldAdd":[^,}]*' | cut -d':' -f2 | tr -d ' ')
-        COMMIT_COUNT=$(cat commit-state.json | grep -o '"commitCount":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+        SHOULD_ADD=$(cat commit-state.json | grep -o '"shouldAdd":[^,}]*' | cut -d':' -f2 | tr -d ' "')
+        COMMIT_COUNT=$(cat commit-state.json | grep -o '"commitCount":[^,}]*' | cut -d':' -f2 | tr -d ' "')
         
         # Ensure loop file exists
         if [ ! -f loop ]; then
@@ -43,10 +62,10 @@ jobs:
           # Add 5 lines
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
           echo "Line added at $TIMESTAMP" >> loop
-          echo "Random data: $RANDOM" >> loop
+          echo "Random data: $RANDOM$RANDOM" >> loop
           echo "Commit cycle: adding lines" >> loop
-          echo "GitHub Action run: $GITHUB_RUN_NUMBER" >> loop
-          echo "Memory info: $(free -h | grep Mem | awk '{print $3}')" >> loop
+          echo "GitHub Action run: $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT" >> loop
+          echo "Workflow: $GITHUB_WORKFLOW triggered by $GITHUB_EVENT_NAME" >> loop
           
           ACTION="Added 5 lines"
           NEW_SHOULD_ADD="false"
@@ -80,15 +99,17 @@ jobs:
         echo "COMMIT_COUNT=$NEW_COMMIT_COUNT" >> $GITHUB_ENV
 
     - name: Commit and push changes
+      if: steps.time_check.outputs.skip == 'false'
       run: |
         git add .
         
         if [ -n "$(git status --porcelain)" ]; then
-          COMMIT_MESSAGE="Auto commit - $ACTION - $(date '+%m/%d/%Y, %I:%M:%S %p') UTC"
+          COMMIT_MESSAGE="Auto commit #$COMMIT_COUNT - $ACTION - $(date '+%m/%d/%Y, %I:%M:%S %p') UTC"
           git commit -m "$COMMIT_MESSAGE"
           git push
           echo "✅ Committed and pushed: $COMMIT_MESSAGE"
           echo "📊 Total commits so far: $COMMIT_COUNT"
+          echo "🕐 Next commit in ~5 minutes"
         else
           echo "No changes to commit"
         fi
