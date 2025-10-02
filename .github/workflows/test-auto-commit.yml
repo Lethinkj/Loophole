@@ -1,0 +1,37 @@
+name: Test Auto Commit Now
+
+on:
+  workflow_dispatch: # Manual trigger only
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  test-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Test"
+
+    - name: Make test commit
+      run: |
+        # Add test content
+        echo "TEST: Manual trigger at $(date -u)" >> loop
+        echo "Last test: $(date -u)" > test-commit.txt
+        
+        # Commit and push
+        git add .
+        git commit -m "TEST: Manual auto-commit trigger - $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+        git push
+        
+        echo "✅ Test commit completed successfully!"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
