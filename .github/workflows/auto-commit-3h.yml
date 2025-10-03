@@ -1,9 +1,10 @@
-name: Auto Commit Every Hour
+name: Auto Commit Every 3.5 Hours
 
 on:
   schedule:
-    # Run every hour at minute 0
-    - cron: '0 * * * *'
+    # Run every 3.5 hours (at 00:30, 04:00, 07:30, 11:00, 14:30, 18:00, 21:30)
+    - cron: '30 0,7,14,21 * * *'
+    - cron: '0 4,11,18 * * *'
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -29,18 +30,18 @@ jobs:
     - name: Check current state and perform action
       run: |
         # Create state file if it doesn't exist
-        if [ ! -f commit-state-1h.json ]; then
-          echo '{"shouldAdd": true, "commitCount": 0}' > commit-state-1h.json
+        if [ ! -f commit-state-3h.json ]; then
+          echo '{"shouldAdd": true, "commitCount": 0}' > commit-state-3h.json
         fi
         
         # Read current state using simpler approach
-        if grep -q '"shouldAdd": true' commit-state-1h.json; then
+        if grep -q '"shouldAdd": true' commit-state-3h.json; then
           SHOULD_ADD=true
         else
           SHOULD_ADD=false
         fi
         
-        COMMIT_COUNT=$(grep -o '"commitCount": [0-9]*' commit-state-1h.json | grep -o '[0-9]*' || echo 0)
+        COMMIT_COUNT=$(grep -o '"commitCount": [0-9]*' commit-state-3h.json | grep -o '[0-9]*' || echo 0)
         
         # Ensure loop file exists
         if [ ! -f loop ]; then
@@ -51,11 +52,11 @@ jobs:
         if [ "$SHOULD_ADD" = "true" ]; then
           # Add 5 lines
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
-          echo "1H Line added at $TIMESTAMP" >> loop
-          echo "1H Random data: $RANDOM$RANDOM" >> loop
-          echo "1H Commit cycle: adding lines" >> loop
-          echo "1H GitHub Action run: $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT" >> loop
-          echo "1H Workflow: scheduled every hour" >> loop
+          echo "3.5H Line added at $TIMESTAMP" >> loop
+          echo "3.5H Random data: $RANDOM$RANDOM" >> loop
+          echo "3.5H Commit cycle: adding lines" >> loop
+          echo "3.5H GitHub Action run: $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT" >> loop
+          echo "3.5H Workflow: scheduled every 3.5 hours" >> loop
           
           ACTION="Added 5 lines"
           NEW_SHOULD_ADD="false"
@@ -79,10 +80,10 @@ jobs:
         
         # Update state
         NEW_COMMIT_COUNT=$((COMMIT_COUNT + 1))
-        echo "{\"shouldAdd\": $NEW_SHOULD_ADD, \"commitCount\": $NEW_COMMIT_COUNT}" > commit-state-1h.json
+        echo "{\"shouldAdd\": $NEW_SHOULD_ADD, \"commitCount\": $NEW_COMMIT_COUNT}" > commit-state-3h.json
         
         # Update timestamp file
-        echo "Last 1H auto commit: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" > last-auto-commit-1h.txt
+        echo "Last 3.5H auto commit: $(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")" > last-auto-commit-3h.txt
         
         # Set environment variables for commit
         echo "ACTION=$ACTION" >> $GITHUB_ENV
@@ -93,11 +94,11 @@ jobs:
         git add .
         
         if [ -n "$(git status --porcelain)" ]; then
-          COMMIT_MESSAGE="Auto commit 1H #$COMMIT_COUNT - $ACTION - $(date '+%m/%d/%Y, %I:%M:%S %p') UTC"
+          COMMIT_MESSAGE="Auto commit 3.5H #$COMMIT_COUNT - $ACTION - $(date '+%m/%d/%Y, %I:%M:%S %p') UTC"
           git commit -m "$COMMIT_MESSAGE"
           git push
           echo "✅ Committed and pushed: $COMMIT_MESSAGE"
-          echo "📊 Total 1H commits so far: $COMMIT_COUNT"
+          echo "📊 Total 3.5H commits so far: $COMMIT_COUNT"
         else
           echo "No changes to commit"
         fi
