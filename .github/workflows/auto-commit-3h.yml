@@ -24,7 +24,7 @@ jobs:
 
     - name: Configure Git
       run: |
-        git config --local user.email "lethinkj@gmail.com"
+        git config --local user.email "kjlethin24@gmail.com"
         git config --local user.name "Lethinkj"
 
     - name: Check current state and perform action
