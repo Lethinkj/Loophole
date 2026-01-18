@@ -1,4 +1,4 @@
-# Loophole - Auto Commit Repository
+#Loophole - Auto Commit Repository
 
 This repository automatically commits changes every 5 minutes using GitHub Actions - no manual intervention required!
 
