@@ -1,0 +1,26 @@
+{
+  "name": "censored-auto-commit",
+  "version": "1.0.0",
+  "description": "Auto-commit service using Render and Node.js",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "commit": "node auto-commit.js",
+    "dev": "node app.js"
+  },
+  "keywords": [
+    "auto-commit",
+    "render",
+    "scheduler"
+  ],
+  "author": "lethin",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-cron": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
