@@ -12,9 +12,36 @@ function setupGitConfig() {
   try {
     execSync('git config user.name "lethin"', { stdio: 'inherit' });
     execSync('git config user.email "lethin@auto-commit.local"', { stdio: 'inherit' });
+    console.log('✓ Git configured');
   } catch (error) {
     console.error('❌ Git config failed:', error.message);
     throw error;
+  }
+}
+
+function setupGitRemote() {
+  try {
+    // Check if origin exists
+    try {
+      execSync('git remote get-url origin', { stdio: 'pipe' });
+      console.log('✓ Git remote already configured');
+      return;
+    } catch (e) {
+      // Origin doesn't exist, add it
+    }
+    
+    // Add GitHub token to remote URL
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new Error('GITHUB_TOKEN environment variable not set');
+    }
+    
+    const remoteUrl = `https://${token}@github.com/Lethinkj/censored.git`;
+    execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
+    console.log('✓ Git remote configured');
+  } catch (error) {
+    // Remote might already exist, that's okay
+    console.log('⚠️  Remote setup (non-critical):', error.message);
   }
 }
 
@@ -52,9 +79,14 @@ function commitAndPush() {
     
     // Try pushing to main, fallback to master
     try {
-      execSync('git push origin main', { stdio: 'inherit' });
-    } catch (error) {
-      execSync('git push origin master', { stdio: 'inherit' });
+      execSync('git push -u origin main 2>&1', { stdio: 'inherit' });
+    } catch (mainError) {
+      try {
+        execSync('git push -u origin master 2>&1', { stdio: 'inherit' });
+      } catch (masterError) {
+        // Try with force if needed
+        execSync('git push -u origin HEAD:main --force 2>&1', { stdio: 'inherit' });
+      }
     }
     
     console.log(`✅ Commit successful: ${commitMsg}`);
@@ -71,7 +103,9 @@ async function main() {
   try {
     // Setup git configuration
     setupGitConfig();
-    console.log('✓ Git configured');
+    
+    // Setup git remote with GitHub token
+    setupGitRemote();
     
     // Add commit line
     const line = addCommitLine();
