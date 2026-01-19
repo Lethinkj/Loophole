@@ -2,6 +2,7 @@
 /**
  * Express web service with node-cron scheduler for auto-commits
  * Runs on Render's free tier without needing paid cron jobs
+ * Makes initial commit on startup
  */
 
 const express = require('express');
@@ -91,6 +92,10 @@ app.post('/commit-now', (req, res) => {
  * Start the server and scheduler
  */
 function startServer() {
+  // Make initial commit on service startup
+  console.log('🚀 Service starting - making initial startup commit...');
+  runAutoCommit();
+  
   setupScheduler();
   
   app.listen(PORT, () => {
