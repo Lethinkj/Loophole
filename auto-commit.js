@@ -25,23 +25,44 @@ function setupGitRemote() {
     try {
       execSync('git remote get-url origin', { stdio: 'pipe' });
       console.log('✓ Git remote already configured');
-      return;
     } catch (e) {
       // Origin doesn't exist, add it
+      const token = process.env.GITHUB_TOKEN;
+      if (!token) {
+        throw new Error('GITHUB_TOKEN environment variable not set');
+      }
+      
+      const remoteUrl = `https://${token}@github.com/Lethinkj/censored.git`;
+      execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
+      console.log('✓ Git remote configured');
     }
-    
-    // Add GitHub token to remote URL
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error('GITHUB_TOKEN environment variable not set');
-    }
-    
-    const remoteUrl = `https://${token}@github.com/Lethinkj/censored.git`;
-    execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
-    console.log('✓ Git remote configured');
   } catch (error) {
-    // Remote might already exist, that's okay
     console.log('⚠️  Remote setup (non-critical):', error.message);
+  }
+}
+
+function checkoutMainBranch() {
+  try {
+    // Fetch latest from origin
+    execSync('git fetch origin main 2>/dev/null || git fetch origin', { stdio: 'pipe' });
+    
+    // Try to checkout main branch
+    try {
+      execSync('git checkout main', { stdio: 'pipe' });
+      console.log('✓ Checked out main branch');
+    } catch (e) {
+      // If main doesn't exist, try to create it tracking origin/main
+      try {
+        execSync('git checkout --track origin/main', { stdio: 'inherit' });
+        console.log('✓ Created and checked out main branch');
+      } catch (e2) {
+        // Last resort: create main from current state
+        execSync('git checkout -b main', { stdio: 'pipe' });
+        console.log('✓ Created main branch');
+      }
+    }
+  } catch (error) {
+    console.log('⚠️  Branch checkout (attempting to continue):', error.message);
   }
 }
 
@@ -106,6 +127,9 @@ async function main() {
     
     // Setup git remote with GitHub token
     setupGitRemote();
+    
+    // Checkout main branch (exit detached HEAD state)
+    checkoutMainBranch();
     
     // Add commit line
     const line = addCommitLine();
