@@ -32,7 +32,8 @@ function setupGitRemote() {
         throw new Error('GITHUB_TOKEN environment variable not set');
       }
       
-      const remoteUrl = `https://${token}@github.com/Lethinkj/censored.git`;
+      // Use Loophole repo to avoid triggering Render auto-deploy
+      const remoteUrl = `https://${token}@github.com/Lethinkj/Loophole.git`;
       execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
       console.log('✓ Git remote configured');
     }
@@ -98,16 +99,12 @@ function commitAndPush() {
     
     execSync(`git commit -m "${commitMsg}"`, { stdio: 'inherit' });
     
-    // Try pushing to main, fallback to master
+    // Push to main branch
     try {
       execSync('git push -u origin main 2>&1', { stdio: 'inherit' });
-    } catch (mainError) {
-      try {
-        execSync('git push -u origin master 2>&1', { stdio: 'inherit' });
-      } catch (masterError) {
-        // Try with force if needed
-        execSync('git push -u origin HEAD:main --force 2>&1', { stdio: 'inherit' });
-      }
+    } catch (pushError) {
+      // Try with force if needed (handles non-fast-forward)
+      execSync('git push -u origin HEAD:main --force 2>&1', { stdio: 'inherit' });
     }
     
     console.log(`✅ Commit successful: ${commitMsg}`);
