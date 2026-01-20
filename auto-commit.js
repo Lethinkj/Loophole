@@ -1,148 +1,71 @@
 #!/usr/bin/env node
 /**
  * Auto-commit script for daily automated commits
- * Adds a timestamp entry to commits.txt file
+ * Commits to a SEPARATE target repo (not the deployment repo)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const os = require('os');
 
-function setupGitConfig() {
-  try {
-    execSync('git config user.name "lethin"', { stdio: 'inherit' });
-    execSync('git config user.email "lethin@auto-commit.local"', { stdio: 'inherit' });
-    console.log('✓ Git configured');
-  } catch (error) {
-    console.error('❌ Git config failed:', error.message);
-    throw error;
-  }
-}
-
-function setupGitRemote() {
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error('GITHUB_TOKEN environment variable not set');
-    }
-    
-    // Use Loophole repo to avoid triggering Render auto-deploy
-    const remoteUrl = `https://${token}@github.com/Lethinkj/Loophole.git`;
-    
-    // Remove existing origin if it exists and set to Loophole
-    try {
-      execSync('git remote remove origin', { stdio: 'pipe' });
-    } catch (e) {
-      // Origin doesn't exist, that's fine
-    }
-    
-    execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
-    console.log('✓ Git remote configured to Loophole');
-  } catch (error) {
-    console.log('⚠️  Remote setup (non-critical):', error.message);
-  }
-}
-
-function checkoutMainBranch() {
-  try {
-    // Fetch latest from origin
-    execSync('git fetch origin main 2>/dev/null || git fetch origin', { stdio: 'pipe' });
-    
-    // Try to checkout main branch
-    try {
-      execSync('git checkout main', { stdio: 'pipe' });
-      console.log('✓ Checked out main branch');
-    } catch (e) {
-      // If main doesn't exist, try to create it tracking origin/main
-      try {
-        execSync('git checkout --track origin/main', { stdio: 'inherit' });
-        console.log('✓ Created and checked out main branch');
-      } catch (e2) {
-        // Last resort: create main from current state
-        execSync('git checkout -b main', { stdio: 'pipe' });
-        console.log('✓ Created main branch');
-      }
-    }
-  } catch (error) {
-    console.log('⚠️  Branch checkout (attempting to continue):', error.message);
-  }
-}
-
-function addCommitLine() {
-  const now = new Date();
-  const timestamp = now.toISOString().split('T')[0] + ' ' + 
-                    now.toTimeString().split(' ')[0];
-  const line = `[${timestamp}] this is auto comited by lethin for any further assistance contact lethin\n`;
-  
-  const commitsFile = path.join(process.cwd(), 'commits.txt');
-  
-  // Ensure commits.txt exists
-  if (!fs.existsSync(commitsFile)) {
-    fs.writeFileSync(commitsFile, '');
-  }
-  
-  // Append the line
-  fs.appendFileSync(commitsFile, line);
-  
-  return line.trim();
-}
-
-function commitAndPush() {
-  try {
-    // Add the file
-    execSync('git add commits.txt', { stdio: 'inherit' });
-    
-    // Commit with timestamp
-    const now = new Date();
-    const timestamp = now.toISOString().split('T')[0] + ' ' + 
-                      now.toTimeString().split(' ')[0];
-    const commitMsg = `Auto-commit by lethin - ${timestamp}`;
-    
-    execSync(`git commit -m "${commitMsg}"`, { stdio: 'inherit' });
-    
-    // Push to main branch
-    try {
-      execSync('git push -u origin main 2>&1', { stdio: 'inherit' });
-    } catch (pushError) {
-      // Try with force if needed (handles non-fast-forward)
-      execSync('git push -u origin HEAD:main --force 2>&1', { stdio: 'inherit' });
-    }
-    
-    console.log(`✅ Commit successful: ${commitMsg}`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Commit failed: ${error.message}`);
-    return false;
-  }
-}
+// Target repo for auto-commits (separate from deployment repo)
+const TARGET_REPO = 'Lethinkj/censored';
 
 async function main() {
   console.log('🤖 Starting auto-commit process...');
   
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    console.error('❌ GITHUB_TOKEN environment variable not set');
+    process.exit(1);
+  }
+
+  // Create temp directory for the target repo
+  const tempDir = path.join(os.tmpdir(), 'auto-commit-' + Date.now());
+  
   try {
-    // Setup git configuration
-    setupGitConfig();
+    // Clone the target repo to temp directory
+    console.log(`📥 Cloning ${TARGET_REPO}...`);
+    const repoUrl = `https://${token}@github.com/${TARGET_REPO}.git`;
+    execSync(`git clone ${repoUrl} "${tempDir}"`, { stdio: 'pipe' });
+    console.log('✓ Cloned target repo');
+
+    // Configure git in the cloned repo
+    execSync('git config user.name "lethin"', { cwd: tempDir, stdio: 'pipe' });
+    execSync('git config user.email "lethin@auto-commit.local"', { cwd: tempDir, stdio: 'pipe' });
+    console.log('✓ Git configured');
+
+    // Create timestamp entry
+    const now = new Date();
+    const timestamp = now.toISOString().split('T')[0] + ' ' + 
+                      now.toTimeString().split(' ')[0];
+    const line = `[${timestamp}] auto-commit by lethin\n`;
     
-    // Setup git remote with GitHub token
-    setupGitRemote();
-    
-    // Checkout main branch (exit detached HEAD state)
-    checkoutMainBranch();
-    
-    // Add commit line
-    const line = addCommitLine();
-    console.log(`✓ Added line: ${line}`);
-    
+    // Append to commits.txt in the target repo
+    const commitsFile = path.join(tempDir, 'commits.txt');
+    fs.appendFileSync(commitsFile, line);
+    console.log(`✓ Added: ${line.trim()}`);
+
     // Commit and push
-    if (commitAndPush()) {
-      console.log('✅ Auto-commit completed successfully!');
-      process.exit(0);
-    } else {
-      console.log('❌ Auto-commit failed!');
-      process.exit(1);
-    }
+    const commitMsg = `Auto-commit - ${timestamp}`;
+    execSync('git add commits.txt', { cwd: tempDir, stdio: 'pipe' });
+    execSync(`git commit -m "${commitMsg}"`, { cwd: tempDir, stdio: 'pipe' });
+    execSync('git push origin main', { cwd: tempDir, stdio: 'pipe' });
+    
+    console.log(`✅ Commit successful: ${commitMsg}`);
+    console.log('✅ Auto-commit completed successfully!');
+
+    // Cleanup temp directory
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    
+    process.exit(0);
   } catch (error) {
     console.error(`❌ Error: ${error.message}`);
+    // Cleanup on error
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {}
     process.exit(1);
   }
 }
