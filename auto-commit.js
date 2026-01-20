@@ -21,22 +21,23 @@ function setupGitConfig() {
 
 function setupGitRemote() {
   try {
-    // Check if origin exists
-    try {
-      execSync('git remote get-url origin', { stdio: 'pipe' });
-      console.log('✓ Git remote already configured');
-    } catch (e) {
-      // Origin doesn't exist, add it
-      const token = process.env.GITHUB_TOKEN;
-      if (!token) {
-        throw new Error('GITHUB_TOKEN environment variable not set');
-      }
-      
-      // Use Loophole repo to avoid triggering Render auto-deploy
-      const remoteUrl = `https://${token}@github.com/Lethinkj/Loophole.git`;
-      execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
-      console.log('✓ Git remote configured');
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new Error('GITHUB_TOKEN environment variable not set');
     }
+    
+    // Use Loophole repo to avoid triggering Render auto-deploy
+    const remoteUrl = `https://${token}@github.com/Lethinkj/Loophole.git`;
+    
+    // Remove existing origin if it exists and set to Loophole
+    try {
+      execSync('git remote remove origin', { stdio: 'pipe' });
+    } catch (e) {
+      // Origin doesn't exist, that's fine
+    }
+    
+    execSync(`git remote add origin ${remoteUrl}`, { stdio: 'inherit' });
+    console.log('✓ Git remote configured to Loophole');
   } catch (error) {
     console.log('⚠️  Remote setup (non-critical):', error.message);
   }
